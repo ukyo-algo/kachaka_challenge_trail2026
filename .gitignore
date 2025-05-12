@@ -8,3 +8,6 @@ __pycache__
 *.pyo
 *.pyd
 *.pdb
+build/
+install/ 
+log/
