@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  kachaka_project:
+    image: weblab/v1-kachaka-jazzy:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DISPLAY=:0
+      - ROS_DOMAIN_ID=1
+    network_mode: host
+    ipc: host
+    privileged: true
+    volumes: 
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../:/app/
+    command: /app/docker/scripts/initialize-docker-container.sh
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - "display:host-gateway"
+    depends_on:
+      - novnc
+
+  novnc:
+    image: theasp/novnc:latest
+    ports:
+      - "8080:8080"  # Web interface port
+      - "5900:5900"  # VNC port 
+      - "6000:6000"  # X11 port
+    restart: unless-stopped
+    environment:
+      - DISPLAY_WIDTH=1920
+      - DISPLAY_HEIGHT=1080
