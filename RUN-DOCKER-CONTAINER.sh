@@ -27,6 +27,20 @@ function setup_project_name() {
 }
 
 function run_docker_container() {
+  # Handle different OS environments
+  COMPOSE_FILE="./docker/docker-compose.yml"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    COMPOSE_FILE="./docker/darwin.docker-compose.yml"
+    echo ""
+    echo "============================================"
+    echo "To view X11 applications from the container:"
+    echo "1. Open a web browser and go to: http://localhost:8080/vnc.html"
+    echo "2. Click 'Connect' in the browser"
+    echo "3. Now you should see X11 applications that you run in the container"
+    echo "============================================"
+    echo ""
+  fi
+
   # Check if container already exists
   if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER}$" || [ $? -eq 1 ]; then
     # Container exists if grep returned 0, doesn't exist if grep returned 1
@@ -36,17 +50,23 @@ function run_docker_container() {
       docker start "${CONTAINER}" || {
         echo "Failed to start container. Removing and recreating..."
         docker rm "${CONTAINER}" || true
-        docker compose --compatibility -p "${PROJECT}" -f ./docker/docker-compose.yml up -d
+        docker compose --compatibility -p "${PROJECT}" -f "${COMPOSE_FILE}" up -d
       }
     else
       echo "Container '${CONTAINER}' does not exist."
       echo "Creating a new container..."
-      docker compose --compatibility -p "${PROJECT}" -f ./docker/docker-compose.yml up -d
+      docker compose --compatibility -p "${PROJECT}" -f "${COMPOSE_FILE}" up -d
     fi
   fi
 }
 
 function setup_x11_auth() {
+  # Check for macOS
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "macOS detected, X11 will be set up through NoVNC."
+    return 0
+  fi
+
   if [ -n "$DISPLAY" ]; then
     XAUTH_RESULT="$(xauth list "$DISPLAY" 2>/dev/null || true)"
     echo "XAUTH_RESULT: $XAUTH_RESULT"
