@@ -7,41 +7,25 @@ endif()
 
 # 独自メッセージの定義に必要
 find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 set(msg_files
   ""
 )
 set(srv_files
-  "KachakaSpeak.srv"
+  ""
 )
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
+  DEPENDENCIES sensor_msgs
 )
 ament_export_dependencies(rosidl_default_runtime)
-
 
 # 依存パッケージ
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
-
-# Pythonパッケージのインストール
-ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
-
-# スクリプトのインストール
-install(PROGRAMS scripts/executor.py DESTINATION lib/${PROJECT_NAME})
-
-install(
-  DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+find_package(sensor_msgs REQUIRED)
 
 ament_package()
