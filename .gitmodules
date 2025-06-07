@@ -4,3 +4,6 @@
 [submodule "ros2_ws/src/kachaka_ros2_dev_kit"]
 	path = ros2_ws/src/kachaka_ros2_dev_kit
 	url = https://github.com/CyberAgentAILab/kachaka_ros2_dev_kit
+[submodule "ros2_ws/src/teleop_twist_keyboard"]
+	path = ros2_ws/src/teleop_twist_keyboard
+	url = https://github.com/ros2/teleop_twist_keyboard.git

@@ -34,8 +34,15 @@ source install/setup.bash
 ```
 
 ## とりあえずsim環境を動かしてみる
-```
+```bash
 ros2 launch kachaka_utils launch_sim.launch.py
+```
+
+以下のコマンドで、kachaka をキーボードで動かすことができるようになる
+
+```bash
+# コンテナ内の別のターミナルで動かす
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args --remap cmd_vel:=/kachaka/manual_control/cmd_vel
 ```
 
 ## terminatorの使い方
