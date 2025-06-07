@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     make \
     terminator \
+    '~nros-jazzy-rqt*' \
 && apt-get clean \
 && rm -rf /var/lib/apt/lists/*
 
