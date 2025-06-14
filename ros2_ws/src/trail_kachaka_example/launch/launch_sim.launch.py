@@ -75,13 +75,26 @@ def generate_launch_description():
                 'map': map_file
             }.items()
         )
-        
-        return [simulation_launch, localization_launch]
-    
+
+        # Include navigation launch file
+        navigation_launch = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(nav2_dir, 'launch', 'navigation_launch.py')
+            ),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                'namespace': namespace,
+                'autostart': 'true',
+                'params_file': os.path.join(nav2_dir, 'params', 'nav2_params.yaml'),
+            }.items()
+        )
+
+        return [simulation_launch, localization_launch, navigation_launch]
+
     # Create and return launch description
     ld = LaunchDescription()
-    
-    # Add declared argumentscol
+
+    # Add declared arguments
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_headless_cmd)
     ld.add_action(declare_namespace_cmd)
