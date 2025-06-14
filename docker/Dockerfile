@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     make \
     terminator \
+    sudo \
+    xauth \
     '~nros-jazzy-rqt*' \
     ros-jazzy-teleop-twist-keyboard \
 && apt-get clean \
@@ -17,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 COPY ./ros2_ws/ /app/ros2_ws/
 WORKDIR /app/ros2_ws/
 # Install rosdep dependencies 
-RUN sudo apt update && \
+RUN apt update && \
     rosdep update && \
     rosdep install -i -r -y --from-paths src
 
@@ -29,14 +31,48 @@ RUN apt-get update -q && apt-get install -y \
 
 COPY ./docker/scripts/ /app/docker/scripts/
 RUN chmod +x /app/docker/scripts/*.sh
-RUN echo 'source /app/docker/scripts/initialize-bash-script.sh' >> ~/.bashrc
 
 # Setup uv
 WORKDIR /app/ 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_LINK_MODE=copy
-RUN echo 'eval "$(uv generate-shell-completion bash)"' >> ~/.bashrc && \
-    uv python install 3.12 && \
+
+# Create a non-root user that matches the host user
+ARG USER_ID
+ARG GROUP_ID
+ARG USERNAME=trail
+
+# Create group first, handle existing group
+RUN getent group ${GROUP_ID} >/dev/null 2>&1 || groupadd -g ${GROUP_ID} ${USERNAME}
+
+# Create user, handle existing user
+RUN if ! getent passwd ${USER_ID} >/dev/null 2>&1; then \
+        useradd -m -u ${USER_ID} -g ${GROUP_ID} -s /bin/bash ${USERNAME}; \
+    else \
+        existing_user=$(getent passwd ${USER_ID} | cut -d: -f1); \
+        usermod -l ${USERNAME} -d /home/${USERNAME} -m $existing_user 2>/dev/null || true; \
+    fi
+
+# Add user to sudoers
+RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set up directories with proper permissions (minimal chown)
+RUN mkdir -p /home/${USERNAME}/.local/share && \
+    chown -R ${USER_ID}:${GROUP_ID} /home/${USERNAME} && \
+    chown ${USER_ID}:${GROUP_ID} /app && \
+    chmod +x /app/docker/scripts/*.sh
+
+# Switch to non-root user
+USER ${USERNAME}
+
+# Setup user-specific configurations
+RUN echo 'source /app/docker/scripts/initialize-bash-script.sh' >> ~/.bashrc && \
+    echo 'eval "$(uv generate-shell-completion bash)"' >> ~/.bashrc
+
+# Setup uv for the user
+COPY --chown=${USER_ID}:${GROUP_ID} ./pyproject.toml uv.lock .python-version /app/
+
+RUN uv python install 3.12 && \
     uv python pin 3.12 && \
     uv venv
 
