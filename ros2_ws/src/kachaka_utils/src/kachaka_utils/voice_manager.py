@@ -2,6 +2,7 @@ from kachaka_interfaces.action import ExecKachakaCommand
 from kachaka_interfaces.msg import KachakaCommand
 from rclpy.action import ActionClient
 from rclpy.node import Node
+import rclpy
 
 
 class VoiceManager:
@@ -20,6 +21,7 @@ class VoiceManager:
         goal_msg = ExecKachakaCommand.Goal()
         goal_msg.kachaka_command = command
         if wait:
-            self._action_client.send_goal_async(goal_msg)
+            future = self._action_client.send_goal_async(goal_msg)
+            rclpy.spin_until_future_complete(self._parent_node, future)
         else:
-            self._action_client.send_goal(goal_msg)
+            self._action_client.send_goal_async(goal_msg)

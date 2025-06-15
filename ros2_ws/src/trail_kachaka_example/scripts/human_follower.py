@@ -17,7 +17,7 @@ def main():
             "Keyboard interrupt, shutting down..."
         )
     finally:
-        task_manager.destroy_node()
+        example_node.destroy_node()
         rclpy.shutdown()
 
 

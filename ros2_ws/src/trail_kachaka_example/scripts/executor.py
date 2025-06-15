@@ -32,8 +32,9 @@ class ExampleTaskManager(Node):
         self.get_logger().info("ExampleTaskManager initialized.")
 
     def execute_task(self):
-        self.voice_manager.speak("こんにちは、私はカチャカです。")
-        if not self.nav_manager.go_to(x=0.0, y=0.0):
+        self.voice_manager.speak("こんにちは、私はカチャカです。", wait=True)
+        self.get_logger().info("Starting the task execution...")
+        if not self.nav_manager.go_to(x=1.5, y=-0.8):
             self.get_logger().error("Failed to navigate to the initial position.")
             return
 
