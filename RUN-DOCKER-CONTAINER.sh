@@ -1,20 +1,22 @@
 #!/bin/bash
 
 # Script to run a Docker container for HSR development
-# Usage: ./RUN-DOCKER-CONTAINER.sh [PROJECT_NAME] [HSR_NUMBER] [--real|-r IP_ADDRESS]
+# Usage: ./RUN-DOCKER-CONTAINER.sh [PROJECT_NAME] [--real|-r IP_ADDRESS]
 
 set -e
 
 # Change to the directory containing the script
 cd "$(dirname "$0")"
 
+USER_ID="$(id -u)"
+GROUP_ID="$(id -g)"
+export USER_ID GROUP_ID
+
 function setup_project_name() {
   if [ -n "$KACHAKA_PROJECT_NAME" ]; then
     PROJECT="$KACHAKA_PROJECT_NAME"
-    HSR_NUMBER="$1"
   elif [ -n "$1" ]; then
     PROJECT="$1"
-    HSR_NUMBER="$2"
   else
     echo "Set KACHAKA_PROJECT_NAME (e.g. 'export KACHAKA_PROJECT_NAME=mytest')"
     exit 1
@@ -28,9 +30,11 @@ function setup_project_name() {
 
 function run_docker_container() {
   # Handle different OS environments
-  COMPOSE_FILE="./docker/docker-compose.yml"
+  DISPLAY="${DISPLAY:-:0}"
+  PROFILE="linux"
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    COMPOSE_FILE="./docker/darwin.docker-compose.yml"
+    DISPLAY=":0"
+    PROFILE="darwin"
     echo ""
     echo "============================================"
     echo "To view X11 applications from the container:"
@@ -50,12 +54,12 @@ function run_docker_container() {
       docker start "${CONTAINER}" || {
         echo "Failed to start container. Removing and recreating..."
         docker rm "${CONTAINER}" || true
-        docker compose --compatibility -p "${PROJECT}" -f "${COMPOSE_FILE}" up -d
+        DISPLAY=$DISPLAY docker compose --compatibility -p "${PROJECT}" --profile "${PROFILE}" -f ./docker/docker-compose.yml up -d
       }
     else
       echo "Container '${CONTAINER}' does not exist."
       echo "Creating a new container..."
-      docker compose --compatibility -p "${PROJECT}" -f "${COMPOSE_FILE}" up -d
+      DISPLAY=$DISPLAY docker compose --compatibility -p "${PROJECT}" --profile "${PROFILE}" -f ./docker/docker-compose.yml up -d
     fi
   fi
 }
@@ -76,7 +80,7 @@ function setup_x11_auth() {
 
     if XAUTH_LIST=$(xauth list "$DISPLAY" 2>/dev/null || true) && [ -n "$XAUTH_LIST" ]; then
       read -r _ XAUTH_PROTOCOL XAUTH_KEY <<<"$XAUTH_LIST"
-      docker exec -it "$CONTAINER" bash -c "touch /root/.Xauthority; xauth add $DISPLAY $XAUTH_PROTOCOL $XAUTH_KEY" || true
+      docker exec -it "$CONTAINER" bash -c "touch \$HOME/.Xauthority; xauth add $DISPLAY $XAUTH_PROTOCOL $XAUTH_KEY" || true
     else
       echo "Warning: Could not set up X11 authentication. GUI applications may not work."
     fi
@@ -84,22 +88,16 @@ function setup_x11_auth() {
 }
 
 function enter_container() {
-    docker exec -it "$CONTAINER" bash || {
-        echo "Failed to enter the container. Please check if the container is running."
-        exit 1
-    }
+    docker exec -it "$CONTAINER" bash
 }
 
 function start_ros2_bridge() {
     if [ -n "$REAL_IP" ]; then
         echo "Starting ROS2 bridge to real Kachaka at $REAL_IP..."
-        ./external/kachaka-api/tools/ros2_bridge/start_bridge.sh "$REAL_IP" || {
+        API_GRPC_BRIDGE_SERVER_URI="${REAL_IP}:26400" NAMESPACE=kachaka FRAME_PREFIX="" docker compose -f ./external/kachaka-api/tools/ros2_bridge/docker-compose.yaml up -d ros2_bridge || {
             echo "Failed to start ROS2 bridge. Please check the IP address and try again."
             exit 1
         }
-    else
-        echo "Entering the container..."
-        enter_container
     fi
 }
 
@@ -135,3 +133,6 @@ setup_x11_auth
 
 # Either start the bridge or enter the container normally
 start_ros2_bridge
+
+echo "Entering the container..."
+enter_container

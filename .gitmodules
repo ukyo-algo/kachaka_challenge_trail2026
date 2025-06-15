@@ -1,6 +1,6 @@
 [submodule "external/kachaka-api"]
 	path = external/kachaka-api
-	url = https://github.com/pf-robotics/kachaka-api
+	url = https://github.com/Damin3927/kachaka-api
 [submodule "ros2_ws/src/kachaka_ros2_dev_kit"]
 	path = ros2_ws/src/kachaka_ros2_dev_kit
-	url = https://github.com/CyberAgentAILab/kachaka_ros2_dev_kit
+	url = https://github.com/Damin3927/kachaka_ros2_dev_kit

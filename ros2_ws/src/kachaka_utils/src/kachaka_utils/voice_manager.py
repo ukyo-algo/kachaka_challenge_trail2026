@@ -11,7 +11,7 @@ class VoiceManager:
             self._parent_node, ExecKachakaCommand, "/kachaka/kachaka_command/execute"
         )
         self._action_client.wait_for_server()
-        self.get_logger().info("Speak action client is ready.")
+        self._parent_node.get_logger().info("Speak action client is ready.")
 
     def speak(self, text: str, wait: bool = False):
         command = KachakaCommand()

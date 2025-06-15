@@ -1,7 +1,8 @@
 import time
 
+from std_msgs.msg import Header
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from lifecycle_msgs.srv import GetState
 from nav2_msgs.action import NavigateThroughPoses, NavigateToPose
@@ -21,7 +22,7 @@ class NavManager:
         self.goal_handle = None
         self.result_future = None
         self.feedback = None
-        self.status = None
+        self.status: GoalStatus | None = None
 
         amcl_pose_qos = QoSProfile(
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -47,12 +48,12 @@ class NavManager:
             PoseWithCovarianceStamped, "initialpose", 10
         )
 
-    def set_initial_pose(self, initial_pose):
+    def set_initial_pose(self, initial_pose: Pose):
         self.initial_pose_received = False
         self.initial_pose = initial_pose
         self._set_initial_pose()
 
-    def go_through_poses(self, poses):
+    def go_through_poses(self, poses: list[PoseStamped]):
         # Sends a `NavToPose` action request and waits for completion
         self.debug("Waiting for 'NavigateToPose' action server")
         while not self.nav_through_poses_client.wait_for_server(timeout_sec=1.0):
@@ -65,8 +66,12 @@ class NavManager:
         send_goal_future = self.nav_through_poses_client.send_goal_async(
             goal_msg, self._feedback_callback
         )
-        rclpy.spin_until_future_complete(self, send_goal_future)
-        self.goal_handle = send_goal_future.result()
+        rclpy.spin_until_future_complete(self.parent_node, send_goal_future)
+        self.goal_handle: NavigateThroughPoses.Result | None = send_goal_future.result()
+
+        if not self.goal_handle:
+            self.error("Goal handle is None")
+            return False
 
         if not self.goal_handle.accepted:
             self.error("Goal with " + str(len(poses)) + " poses was rejected!")
@@ -75,7 +80,23 @@ class NavManager:
         self.result_future = self.goal_handle.get_result_async()
         return True
 
-    def go_to_pose(self, pose):
+    def go_to_async(self, x: float, y: float, yaw: float = 0.0):
+        pose = Pose(
+            position=Point(x=x, y=y, z=0.0),
+            orientation=Quaternion(
+                x=0.0, y=0.0, z=yaw, w=1.0
+            ),
+        )
+        pose_stamped = PoseStamped(
+            pose=pose,
+            header=Header(
+                frame_id="map",
+                stamp=self.parent_node.get_clock().now().to_msg(),
+            )
+        )
+        return self.go_to_pose_async(pose_stamped)
+
+    def go_to_pose_async(self, pose: PoseStamped):
         # Sends a `NavToPose` action request and waits for completion
         self.debug("Waiting for 'NavigateToPose' action server")
         while not self.nav_to_pose_client.wait_for_server(timeout_sec=1.0):
@@ -94,7 +115,7 @@ class NavManager:
         send_goal_future = self.nav_to_pose_client.send_goal_async(
             goal_msg, self._feedback_callback
         )
-        rclpy.spin_until_future_complete(self, send_goal_future)
+        rclpy.spin_until_future_complete(self.parent_node, send_goal_future)
         self.goal_handle = send_goal_future.result()
 
         if not self.goal_handle.accepted:
@@ -110,18 +131,38 @@ class NavManager:
         self.result_future = self.goal_handle.get_result_async()
         return True
 
+    def go_to(self, x: float, y: float, yaw: float = 0.0):
+        """Synchronous version of go_to that waits for navigation to complete"""
+        if not self.go_to_async(x, y, yaw):
+            return False
+
+        while not self.is_nav_complete():
+            rclpy.spin_once(self.parent_node, timeout_sec=0.1)
+
+        return self.get_result() == GoalStatus.STATUS_SUCCEEDED
+
+    def go_to_pose(self, pose: PoseStamped):
+        """Synchronous version of go_to_pose that waits for navigation to complete"""
+        if not self.go_to_pose_async(pose):
+            return False
+
+        while not self.is_nav_complete():
+            rclpy.spin_once(self.parent_node, timeout_sec=0.1)
+
+        return self.get_result() == GoalStatus.STATUS_SUCCEEDED
+
     def cancel_nav(self):
         self.info("Canceling current goal.")
         if self.result_future:
             future = self.goal_handle.cancel_goal_async()
-            rclpy.spin_until_future_complete(self, future)
+            rclpy.spin_until_future_complete(self.parent_node, future)
         return
 
     def is_nav_complete(self):
         if not self.result_future:
             # task was cancelled or completed
             return True
-        rclpy.spin_until_future_complete(self, self.result_future, timeout_sec=0.10)
+        rclpy.spin_until_future_complete(self.parent_node, self.result_future, timeout_sec=0.10)
         if self.result_future.result():
             self.status = self.result_future.result().status
             if self.status != GoalStatus.STATUS_SUCCEEDED:
@@ -160,7 +201,7 @@ class NavManager:
         while state != "active":
             self.debug("Getting " + node_name + " state...")
             future = state_client.call_async(req)
-            rclpy.spin_until_future_complete(self, future)
+            rclpy.spin_until_future_complete(self.parent_node, future)
             if future.result() is not None:
                 state = future.result().current_state.label
                 self.debug("Result of get_state: %s" % state)
@@ -172,7 +213,7 @@ class NavManager:
             self.info("Setting initial pose")
             self._set_initial_pose()
             self.info("Waiting for amcl_pose to be received")
-            rclpy.spin_once(self, timeout_sec=1)
+            rclpy.spin_once(self.parent_node, timeout_sec=1)
         return
 
     def _amcl_pose_callback(self, msg):

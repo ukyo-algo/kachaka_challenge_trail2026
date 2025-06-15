@@ -13,13 +13,13 @@ set(msg_files
   ""
 )
 set(srv_files
-  ""
+  "srv/ExampleHumanFollower.srv"
 )
-# rosidl_generate_interfaces(${PROJECT_NAME}
-#   ${msg_files}
-#   ${srv_files}
-#   DEPENDENCIES sensor_msgs
-# )
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  ${srv_files}
+  DEPENDENCIES sensor_msgs
+)
 ament_export_dependencies(rosidl_default_runtime)
 
 # 依存パッケージ
