@@ -1,10 +1,9 @@
-version: '3'
-
 services:
   kachaka_project:
     image: weblab/v1-kachaka-jazzy:latest
     environment:
       - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
     network_mode: host
     ipc: host
     privileged: true
