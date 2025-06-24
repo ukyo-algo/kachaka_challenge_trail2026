@@ -3,15 +3,20 @@
 - まず初めに仮想環境(コンテナ)を立てる。
     - 初めにイメージ(設計図みたいなもの)を作成して、その後コンテナ(実際の家)を作成する。
     - イメージの作成には結構な時間(10分弱)掛かると思われるので、気長に待とう
-```
+```bash
 # ~/trail/kachaka_challenge_trail2025
-./BUILD-DOCKER-IMAGE.sh
+make build-app
 
-./RUN-DOCKER-CONTAINER.sh [自分の名前] # 例: ./RUN-DOCKER-CONTAINER.sh takeuchi
+./run-docker-container.py [自分の名前] # 例: ./run-docker-container.py takeuchi
+```
+
+```bash
+# if you use a real kachaka for development
+./run-docker-container.py [自分の名前] -r
 ```
 
 - その後、コマンドパレットから```Attach to Running Container...```を検索して、クリック
-    - [自分の名前]_kachaka_project_1(e.g. takeuchi_kachaka_project_1)を選ぶ
+    - [自分の名前]_sim_kachaka_project_1(e.g. takeuchi_sim_kachaka_project_1)を選ぶ
 
 - その後、少しすると新しい画面に切り替わるので、そこで自分のさっきの作業フォルダを開く。その際、(Ctrl + K) > (Ctrl + O)を教えて開くフォルダの選択を行い、```/app```を選択すればいい。
 
@@ -34,8 +39,15 @@ source install/setup.bash
 ```
 
 ## とりあえずsim環境を動かしてみる
-```
+```bash
 ros2 launch kachaka_utils launch_sim.launch.py
+```
+
+以下のコマンドで、kachaka をキーボードで動かすことができるようになる
+
+```bash
+# コンテナ内の別のターミナルで動かす
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args --remap cmd_vel:=/kachaka/manual_control/cmd_vel
 ```
 
 ## terminatorの使い方
