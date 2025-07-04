@@ -24,6 +24,9 @@ class NavManager:
         self.feedback = None
         self.status: GoalStatus | None = None
 
+        # --- 追加：現在のポーズを保持する変数を追加 ---
+        self.current_pose: Pose | None = None
+
         amcl_pose_qos = QoSProfile(
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             reliability=QoSReliabilityPolicy.RELIABLE,
@@ -47,6 +50,20 @@ class NavManager:
         self.initial_pose_pub = self.parent_node.create_publisher(
             PoseWithCovarianceStamped, "initialpose", 10
         )
+
+    # --- 追加：現在の姿勢を取得するメソッド ---
+    def get_current_pose_stamped(self) -> PoseStamped | None:
+        """現在のロボットの姿勢をPoseStamped形式で取得する"""
+        if self.current_pose is None:
+            self.parent_node.get_logger().warn("Current pose is not available yet.")
+            return None
+        
+        pose_stamped = PoseStamped()
+        pose_stamped.header.stamp = self.parent_node.get_clock().now().to_msg()
+        pose_stamped.header.frame_id = 'map'
+        pose_stamped.pose = self.current_pose
+        return pose_stamped
+
 
     def set_initial_pose(self, initial_pose: Pose):
         self.initial_pose_received = False
@@ -79,6 +96,55 @@ class NavManager:
 
         self.result_future = self.goal_handle.get_result_async()
         return True
+
+        def go_to_pose_with_callback(self, pose: PoseStamped, done_callback):
+        """
+        非同期でナビゲーションを実行し、完了後
+        に指定されたコールバック関数を呼び出す
+        """
+        self.debug("Waiting for 'NavigateToPose' action server")
+        if not self.nav_to_pose_client.wait_for_server(timeout_sec=1.0):
+            self.info("'NavigateToPose' action server not available.")
+            # 失敗をコールバックに通知
+            done_callback(None) 
+            return
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = pose
+
+        self.info(f"Navigating to goal: {pose.pose.position.x}, {pose.pose.position.y}...")
+        send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg, self._feedback_callback)
+
+        # send_goal_futureが完了したら、_goal_sent_callbackを呼び出すように設定
+        # done_callbackを部分適用（partial）のようにして渡す
+        send_goal_future.add_done_callback(
+            lambda future: self._goal_sent_callback(future, done_callback)
+        )
+
+    def _goal_sent_callback(self, future, done_callback):
+        """ゴール送信後の処理"""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.error("Goal was rejected!")
+            if done_callback:
+                done_callback(None) # 失敗を通知
+            return
+
+        self.info("Goal accepted. Waiting for result...")
+        result_future = goal_handle.get_result_async()
+        
+        # result_futureが完了したら、最終的なコールバックを呼び出す
+        result_future.add_done_callback(
+            lambda future: self._nav_result_callback(future, done_callback)
+        )
+
+    def _nav_result_callback(self, future, done_callback):
+        """ナビゲーション完了時の最終的な処理"""
+        result = future.result().result
+        status = future.result().status
+        if done_callback:
+            # 成功/失敗のステータスをコールバックに渡す
+            done_callback(status)
 
     def go_to_async(self, x: float, y: float, yaw: float = 0.0):
         pose = Pose(
@@ -222,10 +288,13 @@ class NavManager:
             rclpy.spin_once(self.parent_node, timeout_sec=1)
         return
 
-    def _amcl_pose_callback(self, msg):
+    # --- 修正：amcl_poseコールバックで現在の姿勢を保存 ---
+    def _amcl_pose_callback(self, msg: PoseWithCovarianceStamped):
+        """AMCLから送られてくる自己位置推定結果を保存する"""
         self.initial_pose_received = True
+        self.current_pose = msg.pose.pose # PoseWithCovarianceからPoseを抽出して保存
         return
-
+        
     def _feedback_callback(self, msg):
         self.feedback = msg.feedback
         print(self.feedback)
