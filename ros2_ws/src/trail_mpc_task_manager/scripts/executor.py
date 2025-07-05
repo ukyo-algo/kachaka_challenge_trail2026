@@ -14,6 +14,12 @@ from std_srvs.srv import SetBool
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
 from action_msgs.msg import GoalStatus
+# --- 追加：時間（Duration）を扱うためにインポート ---
+from rclpy.duration import Duration
+
+# --- 追加：位置情報取得のための再試行パラメータ ---
+POSE_RETRY_TIMEOUT_SEC = 5.0  # 最大5秒間、再試行する
+POSE_RETRY_INTERVAL_SEC = 0.2 # 0.2秒間隔で再試行する
 
 
 
@@ -118,8 +124,20 @@ class PartyTaskExecutor(Node):
             self.get_logger().info("Stop signal received from follower node.")
             # 1. 追従を正式に停止させる
             self._set_following_enabled(False)
-            # 2. 現在地を取得して保存する
-            self.last_known_host_pose = self.nav_manager.get_current_pose_stamped()
+            # 2. 現在地を再試行ロジックで確実に取得する
+            self.get_logger().info(f"Attempting to get current pose (timeout: {POSE_RETRY_TIMEOUT_SEC}s)...")
+            start_time = self.get_clock().now()
+            timeout = Duration(seconds=POSE_RETRY_TIMEOUT_SEC)
+            # タイムアウトするまで位置情報の取得を試みる
+            while self.get_clock().now() - start_time < timeout:
+                self.last_known_host_pose = self.nav_manager.get_current_pose_stamped()
+                if self.last_known_host_pose is not None:
+                    # 取得に成功したらループを抜ける
+                    break
+                
+                self.get_logger().info("Pose not available yet, retrying...")
+                # 短い待機時間を入れて、他の処理（AMCLのコールバックなど）を許可する
+                rclpy.spin_once(self, timeout_sec=POSE_RETRY_INTERVAL_SEC)
             if self.last_known_host_pose:
                 pos = self.last_known_host_pose.pose.position
                 self.get_logger().info(f"Host stopped. Location saved: x={pos.x}, y={pos.y}")
