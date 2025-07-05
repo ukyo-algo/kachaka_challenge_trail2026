@@ -207,7 +207,7 @@ class Follower(Node):
         # elif -0.3 > self._closest_angle > -ANGULAR_TOLERANCE:
         elif -0.3 > self._closest_angle:
             self.get_logger().info("turn left")
-            cmd_vel.angular.z = -1.0
+            cmd_vel.angular.z = -1.0"""
         # elif 0.15 < self._closest_angle < ANGULAR_TOLERANCE:
         # elif 0.3 < self._closest_angle:
         #     self.get_logger().info("turn right")
