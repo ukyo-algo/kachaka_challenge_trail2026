@@ -44,6 +44,9 @@ class Follower(Node):
         self._closest_distance = float("inf")
         self._closest_angle = 0.0
 
+        # --- 追跡用の履歴 ---
+        self.previous_turn = ""
+
         # --- 追加：音声マネージャーの初期化 ---
         self.voice_manager = VoiceManager(self)
 
@@ -93,9 +96,9 @@ class Follower(Node):
             self.get_logger().info("Following disabled.")
             self._state = FollowerState.IDLE
             self._stop_robot()
-            if self._timer and not self._timer.cancelled:
+            if self._timer and not self._timer.is_canceled():
                 self._timer.cancel()
-            if self._confirmation_timer and not self._confirmation_timer.cancelled:
+            if self._confirmation_timer and not self._confirmation_timer.is_canceled():
                 self._confirmation_timer.cancel()
 
         response.success = True
@@ -114,12 +117,12 @@ class Follower(Node):
             self.get_logger().info('Person detected for the first time.')
             self._position_history.clear()
             self._person_in_detection = True
-        elif not is_person_found and self._person_in_detection:
+        """elif not is_person_found and self._person_in_detection:
             self.get_logger().info('Person lost.')
-            self._person_in_detection = False
+            self._person_in_detection = False"""
 
     def _laser_scan_callback(self, msg: LaserScan) -> None:
-        """LiDARデータから最近傍物体を検出""""
+        """LiDARデータから最近傍物体を検出"""
         if self._state == FollowerState.IDLE:
             return
 
@@ -161,7 +164,7 @@ class Follower(Node):
     def _execute_following(self):
         """追跡を実行する"""
         # 人がいない、または遠すぎる場合は停止
-        if not self._person_in_detection or self._closest_distance > MAX_RANGE_FOR_FOLLOW * 1.5:
+        if not self._person_in_detection :
             self._stop_robot()
             return
 
@@ -173,28 +176,55 @@ class Follower(Node):
         self.get_logger().info(f"{self._closest_angle=}, {self._closest_distance=}")
         cmd_vel = Twist()
         # if 0.3 < self._closest_angle < ANGULAR_TOLERANCE:
-        if 0.3 < self._closest_angle:
-            self.get_logger().info("turn right")
-            cmd_vel.angular.z = 1.0 #self._closest_angle*2
-        # elif -0.3 > self._closest_angle > -ANGULAR_TOLERANCE:
-        elif -0.3 > self._closest_angle:
-            self.get_logger().info("turn left")
-            cmd_vel.angular.z = -1.0
+
+        if self._closest_distance > MAX_RANGE_FOR_FOLLOW :
+            if self.previous_turn == "left":
+                self.get_logger().info("turn left")
+                cmd_vel.angular.z = -1.0
+            elif self.previous_turn == "right":
+                self.get_logger().info("turn right")
+                cmd_vel.angular.z = 1.0
+            else :
+                self.get_logger().info("go forward")
+                cmd_vel.linear.x = 0.5
+        else :
+            cmd_vel.linear.x = 0.4
+            cmd_vel.angular.z = self._closest_angle*2
+            if 0.3 < self._closest_angle:
+                self.get_logger().info("turn right")
+                self.previous_turn = "right"
+            # elif -0.3 > self._closest_angle > -ANGULAR_TOLERANCE:
+            elif -0.3 > self._closest_angle:
+                self.get_logger().info("turn left")
+                self.previous_turn = "left"
+            else :
+                self.previous_turn = ""
         # elif 0.15 < self._closest_angle < ANGULAR_TOLERANCE:
-        elif 0.15 < self._closest_angle:
-            cmd_vel.linear.x = 0.7
-            cmd_vel.angular.z = 0.4
-        # elif -0.15 > self._closest_angle > -ANGULAR_TOLERANCE:
-        elif -0.15 > self._closest_angle:
-            self._cmd_vel.linear.x = 0.7
-            cmd_vel.angular.z = -0.4
-        elif self._closest_angle > ANGULAR_TOLERANCE or self._closest_angle < -ANGULAR_TOLERANCE:
-             cmd_vel.linear.x = 0.0
-             cmd_vel.angular.z = 0.0   
-        else:
-            if self._closest_distance < MAX_RANGE_FOR_FOLLOW:
-                self.get_logger().info("go foward")
-                cmd_vel.linear.x = 0.3 #self._closest_distance*1.5
+        # elif 0.3 < self._closest_angle:
+        #     self.get_logger().info("turn right")
+        #     self.previous_turn = "right"
+        #     cmd_vel.angular.z = self._closest_angle*2
+        # # elif -0.3 > self._closest_angle > -ANGULAR_TOLERANCE:
+        # elif -0.3 > self._closest_angle:
+        #     self.get_logger().info("turn left")
+        #     self.previous_turn = "left"
+        #     cmd_vel.angular.z = -self._closest_angle*2
+        # # elif 0.15 < self._closest_angle < ANGULAR_TOLERANCE:
+        # else :
+        #     self.previous_turn = ""
+        #     if 0.15 < self._closest_angle:
+        #         cmd_vel.linear.x = 0.3
+        #         cmd_vel.angular.z = 0.4
+        #     # elif -0.15 > self._closest_angle > -ANGULAR_TOLERANCE:
+        #     elif -0.15 > self._closest_angle:
+        #         cmd_vel.linear.x = 0.3
+        #         cmd_vel.angular.z = -0.4
+        #     elif self._closest_angle > ANGULAR_TOLERANCE or self._closest_angle < -ANGULAR_TOLERANCE:
+        #         cmd_vel.linear.x = 0.0
+        #         cmd_vel.angular.z = 0.0   
+        #     else:
+        #         self.get_logger().info("go foward")
+        #         cmd_vel.linear.x = self._closest_distance*1.5
         self._publisher.publish(cmd_vel)
 
     def _check_for_stop_signal(self):
@@ -230,7 +260,7 @@ class Follower(Node):
         if np.any(std_dev > CONFIRMATION_MOVE_THRESHOLD):
             self.get_logger().info("Movement detected! Resuming following.")
             self._state = FollowerState.FOLLOWING
-            if self._confirmation_timer and not self._confirmation_timer.cancelled:
+            if self._confirmation_timer and not self._confirmation_timer.cancel:
                 self._confirmation_timer.cancel()
             self._position_history.clear()
 
@@ -238,7 +268,7 @@ class Follower(Node):
         """確認がタイムアウトした時の処理（人間が静止し続けた場合）"""
         self.get_logger().info('Confirmation timed out. Assuming host has stopped.')
         self._state = FollowerState.IDLE # タスク完了
-        if self._confirmation_timer and not self._confirmation_timer.cancelled:
+        if self._confirmation_timer and not self._confirmation_timer.is_canceled():
             self._confirmation_timer.cancel()
         
         # Executorにホストが停止したことを通知
@@ -247,11 +277,11 @@ class Follower(Node):
         self._stopped_publisher.publish(msg)
         
         # メインループを停止
-        if self._timer and not self._timer.cancelled:
+        if self._timer and not self._timer.is_canceled():
             self._timer.cancel()
 
 
     def _stop_robot(self):
         """ロボットを確実に停止させる"""
         cmd_vel = Twist()
-        self._vel_publisher.publish(cmd_vel)
+        self._publisher.publish(cmd_vel)

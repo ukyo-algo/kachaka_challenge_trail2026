@@ -6,8 +6,8 @@ def get_named_pose(name: str) -> PoseStamped:
     pose.header.stamp.sec = 0  # nav2が必要な場合はTime.nowで補完
 
     if name == "host_room":
-        pose.pose.position.x = 0.3
-        pose.pose.position.y = 0.3
+        pose.pose.position.x = 7.0
+        pose.pose.position.y = -2.0
         pose.pose.orientation.z = 0.707
         pose.pose.orientation.w = 0.707
     elif name == "entrance":

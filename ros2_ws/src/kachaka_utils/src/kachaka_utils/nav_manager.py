@@ -97,7 +97,7 @@ class NavManager:
         self.result_future = self.goal_handle.get_result_async()
         return True
 
-        def go_to_pose_with_callback(self, pose: PoseStamped, done_callback):
+    def go_to_pose_with_callback(self, pose: PoseStamped, done_callback):
         """
         非同期でナビゲーションを実行し、完了後
         に指定されたコールバック関数を呼び出す

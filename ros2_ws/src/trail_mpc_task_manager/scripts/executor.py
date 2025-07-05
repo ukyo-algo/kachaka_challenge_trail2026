@@ -9,6 +9,9 @@ import rclpy
 from rclpy.node import Node
 from std_srvs.srv import SetBool
 from std_msgs.msg import Bool
+from geometry_msgs.msg import PoseStamped
+from action_msgs.msg import GoalStatus
+
 
 
 class PartyTaskExecutor(Node):
@@ -91,6 +94,7 @@ class PartyTaskExecutor(Node):
         """ホストの追従タスクを開始"""
         self.state = 'follow_host'
         self.get_logger().info('State: follow_host. Starting...')
+        self.voice_manager.speak('追従を開始します。')
         self._set_following_enabled(True)
         self._follow_started = True
 
@@ -201,7 +205,8 @@ def main(args=None):
     rclpy.init(args=args)
     executor = PartyTaskExecutor()
     # ミッションを開始
-    executor.start_mission()
+    #executor.start_mission()
+    executor._execute_follow_host()
     rclpy.spin(executor)
     executor.destroy_node()
     rclpy.shutdown()
