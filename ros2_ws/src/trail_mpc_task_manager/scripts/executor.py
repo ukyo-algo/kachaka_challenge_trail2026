@@ -32,7 +32,7 @@ class PartyTaskExecutor(Node):
         self.camera_manager = CameraManager(self)
         self.llm_manager = LLMManager()
         self.wait_state = WaitForReady(self,self.voice_manager)
-        self.guest_meet_task = GuestMeetTaskManager(self,camera_manager, self.voice_manager, self.llm_manager)
+        self.guest_meet_task = GuestMeetTaskManager(self, self.camera_manager, self.voice_manager, self.llm_manager)
 
         # --- 追加：ホストが停止した最後の場所を保存する変数 ---
         self.last_known_host_pose: PoseStamped | None = None

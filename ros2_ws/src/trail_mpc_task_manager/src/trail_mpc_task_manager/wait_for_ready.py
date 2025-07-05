@@ -63,11 +63,9 @@ class WaitForReady:
                 elapsed = (self.parent_node.get_clock().now() - self._person_detected_start_time).nanoseconds / 1e9
                 self.parent_node.get_logger().info(f"Person detected for {elapsed:.1f} seconds.", throttle_duration_sec=1.0)
                 
-                if 2<= elapsed <=3:
+                if 2<= elapsed <=3 and not self._whether_speak:
                     self._whether_speak = True
-                if self._whether_speak:
                     self.voice_manager.speak('認識しました。そのままお待ちください。ホストまたはゲストでない場合はカメラの外に出てください。')
-                    self._whether_speak = False
                 # 規定時間を超えたらタスク完了
                 if elapsed >= REQUIRED_DURATION_SEC:
                     self.parent_node.get_logger().info("Host/Guest is ready. Task complete.")
@@ -80,6 +78,8 @@ class WaitForReady:
         else:
             if self._person_detected_start_time is not None:
                 self.parent_node.get_logger().info("Person lost. Resetting timer.")
-                self.voice_manager.speak('認識が途切れました。もう一度お願いします。')
+                if self._whether_speak:
+                    self._whether_speak = False
+                    self.voice_manager.speak('認識が途切れました。もう一度お願いします。')
             self._person_detected_start_time = None
 

@@ -88,7 +88,7 @@ class Follower(Node):
         if request.data:
             self.get_logger().info("Following enabled. Starting main loop.")
             self._state = FollowerState.FOLLOWING
-            self.voice_manager().speak("追従を開始します。パーティー会場まで歩いてください。到着したら10秒間止まってください。")
+            self.voice_manager.speak("追従を開始します。パーティー会場まで歩いてください。到着したら10秒間止まってください。")
             self._person_in_detection = False
             self._position_history.clear()
             # 0.1秒ごとにメインループ(_publish_cmd_vel)を実行するタイマーを開始
@@ -96,7 +96,7 @@ class Follower(Node):
         else:
             self.get_logger().info("Following disabled.")
             self._state = FollowerState.IDLE
-            self.voice_manager().speak("追従を停止します。")
+            self.voice_manager.speak("追従を停止します。")
             self._stop_robot()
             if self._timer and not self._timer.is_canceled():
                 self._timer.cancel()
