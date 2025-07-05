@@ -7,6 +7,7 @@ from kachaka_utils.llm_manager import LLMManager
 from kachaka_utils.camera_manager import CameraManager
 from trail_mpc_task_manager.wait_for_ready import WaitForReady
 from trail_mpc_task_manager.guest_meet_task import GuestMeetTaskManager
+from trail_mpc_task_manager import FindEmptyChairTaskManager
 
 import rclpy
 from rclpy.node import Node
@@ -32,7 +33,8 @@ class PartyTaskExecutor(Node):
         self.camera_manager = CameraManager(self)
         self.llm_manager = LLMManager()
         self.wait_state = WaitForReady(self,self.voice_manager)
-        self.guest_meet_task = GuestMeetTaskManager(self, self.camera_manager, self.voice_manager, self.llm_manager)
+        self.guest_meet_task = GuestMeetTaskManager(self,camera_manager, self.voice_manager, self.llm_manager)
+        self.find_empty_chair = FindEmptyChairTaskManager(self, self.camera_manager, self.voice_manager, self.llm_manager)
 
         # --- 追加：ホストが停止した最後の場所を保存する変数 ---
         self.last_known_host_pose: PoseStamped | None = None
@@ -225,8 +227,9 @@ class PartyTaskExecutor(Node):
         """ゲストに空いている席を示す"""
         self.state = 'find_empty_chair'
         self.get_logger().info("State: find_empty_chair")
-        #　ここにゲストに空いている席を案内するロジックを実装
+        self.find_empty_chair.execute_find_empty_chair()
         self._execute_go_to_entrance()
+
 
     def _handle_mission_failure(self, reason: str):
         self.get_logger().error(f"MISSION FAILED: {reason}")
@@ -249,7 +252,12 @@ class PartyTaskExecutor(Node):
             self.wait_state.cancel()
             self.voice_manager.speak("タスクを再実行します")
             self._execute_wait_for_guest_ready()
-    
+        if self.state == 'return_to_host':
+            if reason == "ホストの場所が保存されていません。":
+                self.voice_manager("タスクを中止します")
+            else:  
+                self.voice_manager('タスクを再実行します。')
+                self._execute_return_to_host()
 
             
 
