@@ -25,7 +25,7 @@ ros2_ws/src/
 create_ros2_pkg
 ```
 
-パッケージ名（例: `my_task2`）と作成者情報を入力するとテンプレートから自動生成されます。
+パッケージ名（例: `my_task2`）と作成者情報を入力するとテンプレートから自動生成されます。(coockiecutterを使用しています)
 
 生成されるディレクトリ構成:
 
@@ -53,7 +53,7 @@ my_task2/
 
 **複数ノードを同時に起動したい場合**: `launch/` にlaunchファイルを置き、`ros2 launch my_task2 task2.launch.py` で一括起動できます。
 
-`trail_kachaka_sample` パッケージが動く例になっているので参考にしてください。
+`trail_kachaka_sample` パッケージが動く例になっているので参考にしてください。必要に応じて、package.xmlやlaunchファイルもテンプレートからコピーした状態から編集してください。
 
 ---
 

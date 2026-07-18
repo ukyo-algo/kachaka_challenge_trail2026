@@ -200,7 +200,7 @@ kachaka_challenge_trail2026/
 
 | 項目 | バージョン |
 |---|---|
-| hardware | m |
+| hardware | AppleM2で動作確認済みなので、これよりスペックが良ければ。（ちなみにCPU使用率は90%越えでした） |
 | Docker | 最新安定版 |
 | macOS の場合 | Docker Desktop |
 

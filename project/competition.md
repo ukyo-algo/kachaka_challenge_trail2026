@@ -30,9 +30,9 @@ ros2 launch kachaka_utils launch_sim.launch.py task:=<タスク番号>
 - 音声・LLM は使用しない（シミュレーション環境では非対応）
 - 物理的な棚の移動は不可
 
-### 補足事項
+### 補足事項 
 
-タスク1はsampleプログラムとして実装していますが、タスク2以降に関してはjudgeシステムの動作確認を指定なので、何か問題等あれば教えてください。
+タスク2以降について、物体検出が必要となりますが、Gazeboの3Dモデルだと検出確率が低くなります。タスク2のcanは、正面を向けば信頼度は低くとも検出できることが多かったです。タスク3のbottle, cupについては未検出・誤検出となる確率が多くなるかもしれません。
 
 ---
 
@@ -85,7 +85,7 @@ ros2 topic echo /task1_judge/status
 
 ### 概要
 
-倉庫内に配置された **10 個のボトル** を YOLO で検出し、発見した情報を採点ノードに送信する。
+倉庫内に配置された **10 個の缶** を YOLO で検出し、発見した情報を採点ノードに送信する。
 
 ### ゴミの座標（公開情報）
 
@@ -117,7 +117,7 @@ ros2 topic echo /task1_judge/status
 
 ```
 std_msgs/Header header       # タイムスタンプ
-string garbage_class         # "bottle"
+string garbage_class         # "can"
 float32 confidence           # YOLO の信頼度 (0.0〜1.0)
 float32 robot_x              # 発見時のロボット X 座標
 float32 robot_y              # 発見時のロボット Y 座標
@@ -139,7 +139,7 @@ ros2 topic echo /task2_judge/status
 
 ### 実装目標
 
-1. ゴミの座標を順番に巡回しながら YOLO でボトルを検出する
+1. ゴミの座標を順番に巡回しながら YOLO で缶を検出する（クラス ID: 46）
 2. 発見したら `FoundGarbage` を `/task2/found_garbage` に publish する
 
 ---

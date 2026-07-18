@@ -2,26 +2,13 @@
 """
 Task 2 自動採点ノード
 
-学習者が /task2/found_garbage に FoundGarbage メッセージを送ると、
-このノードが受信して結果を表示・採点します。
-
-【学習者がやること】
-1. ロボットを探索ポイントに移動させる
-2. カメラ画像で YOLO を使ってゴミ（bottle）を検出する
-3. 検出したら /task2/found_garbage に FoundGarbage を publish する
-
-【このノードがやること】
-- /task2/found_garbage を受信して内容を表示
-- 送られてきた画像をウィンドウに表示（image.data が空でなければ）
-- 発見数とスコアをログに出力
-- /task2_judge/status に JSON 形式でスコアを配信
-
-【採点】
-スコア = 発見数 × 10 点（重複チェック: 2.0m 以内の再送は無視）
+/task2/found_garbage に FoundGarbage メッセージが届いたら
+内容をログに表示し、画像があればウィンドウに表示します。
 """
 
 import json
-import math
+from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 
@@ -36,13 +23,14 @@ try:
 except ImportError:
     CV2_AVAILABLE = False
 
-DUPLICATE_THRESHOLD = 2.0
+SAVE_DIR = Path('/app/judge_results/task2')
 
 
 class Task2Judge(Node):
     def __init__(self):
         super().__init__('task2_judge')
-        self.found_items = []
+        self.received: list[dict] = []
+        SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
         self.create_subscription(
             FoundGarbage, '/task2/found_garbage', self._callback, 10
@@ -51,66 +39,58 @@ class Task2Judge(Node):
 
         self.get_logger().info('=' * 55)
         self.get_logger().info(' Task 2 Judge 起動完了 — ゴミ検出チャレンジ')
-        self.get_logger().info(' 以下のトピックにゴミ発見情報を送信してください:')
-        self.get_logger().info('   /task2/found_garbage  (trail_kachaka_msgs/FoundGarbage)')
+        self.get_logger().info(' トピック: /task2/found_garbage (trail_kachaka_msgs/FoundGarbage)')
+        self.get_logger().info(f' 画像保存先: {SAVE_DIR}')
         self.get_logger().info('=' * 55)
 
     def _callback(self, msg: FoundGarbage):
-        if self._is_duplicate(msg.robot_x, msg.robot_y):
-            self.get_logger().warn(
-                f'[重複] ({msg.robot_x:.1f}, {msg.robot_y:.1f}) は既存の発見と近すぎます。スキップ。'
-            )
-            return
-
+        n = len(self.received) + 1
         item = {
-            'id': len(self.found_items) + 1,
+            'id': n,
             'class': msg.garbage_class,
             'confidence': round(float(msg.confidence), 3),
             'x': round(float(msg.robot_x), 2),
             'y': round(float(msg.robot_y), 2),
         }
-        self.found_items.append(item)
+        self.received.append(item)
 
-        score = len(self.found_items) * 10
         self.get_logger().info(
-            f'[発見 #{item["id"]}] {item["class"]} '
-            f'(信頼度: {item["confidence"]:.1%}) '
-            f'at ({item["x"]:.1f}, {item["y"]:.1f}) | スコア: {score}点'
+            f'[受信 #{n}] class={item["class"]}  '
+            f'conf={item["confidence"]:.1%}  '
+            f'pos=({item["x"]:.1f}, {item["y"]:.1f})'
         )
 
-        self._try_show_image(msg, item)
-        self._publish_status(score)
+        self._show_and_save_image(msg, n)
+        self._publish_status()
 
-    def _is_duplicate(self, x: float, y: float) -> bool:
-        for item in self.found_items:
-            dist = math.sqrt((item['x'] - x) ** 2 + (item['y'] - y) ** 2)
-            if dist < DUPLICATE_THRESHOLD:
-                return True
-        return False
-
-    def _try_show_image(self, msg: FoundGarbage, item: dict):
+    def _show_and_save_image(self, msg: FoundGarbage, n: int):
         if not CV2_AVAILABLE or len(msg.image.data) == 0:
             return
         try:
             np_arr = np.frombuffer(bytes(msg.image.data), np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            if img is not None:
-                label = f'#{item["id"]}: {item["class"]} ({item["confidence"]:.0%})'
-                cv2.putText(img, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                cv2.imshow(f'Task2 Judge — 発見 #{item["id"]}', img)
-                cv2.waitKey(1)
-        except Exception as e:
-            self.get_logger().warn(f'画像表示エラー: {e}')
+            if img is None:
+                return
 
-    def _publish_status(self, score: int):
-        status = {
-            'task': 2,
-            'found': len(self.found_items),
-            'score': score,
-            'items': self.found_items,
-        }
+            # ウィンドウに表示（手動で閉じるまで残る）
+            win_title = f'Task2 Judge — #{n} {msg.garbage_class}'
+            cv2.imshow(win_title, img)
+            cv2.waitKey(1)
+
+            # ファイルに保存
+            timestamp = datetime.now().strftime('%H%M%S')
+            filename = SAVE_DIR / f'{n:02d}_{msg.garbage_class}_{timestamp}.jpg'
+            cv2.imwrite(str(filename), img)
+            self.get_logger().info(f'  画像保存: {filename.name}')
+        except Exception as e:
+            self.get_logger().warn(f'画像処理エラー: {e}')
+
+    def _publish_status(self):
         msg = String()
-        msg.data = json.dumps(status, ensure_ascii=False)
+        msg.data = json.dumps(
+            {'task': 2, 'received': len(self.received), 'items': self.received},
+            ensure_ascii=False,
+        )
         self.status_pub.publish(msg)
 
 
