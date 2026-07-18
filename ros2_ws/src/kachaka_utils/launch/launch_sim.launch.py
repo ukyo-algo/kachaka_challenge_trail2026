@@ -1,57 +1,61 @@
-# Copyright (C) 2023 Kachaka
-
 import os
+
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # Get directories
     sim_dir = get_package_share_directory('kachaka_gazebo')
     nav2_dir = get_package_share_directory('kachaka_nav2_bringup')
-    
-    # Create launch configuration variables
+
     use_sim_time = LaunchConfiguration('use_sim_time', default='True')
-    headless = LaunchConfiguration('headless', default='True')
+    headless = LaunchConfiguration('headless', default='False')
     namespace = LaunchConfiguration('namespace', default='')
     map_name = LaunchConfiguration('map_name', default='sample_world')
-    
-    # Declare launch arguments
+    task = LaunchConfiguration('task', default='0')
+
     declare_use_sim_time_cmd = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='True',
-        description='Use simulation clock if true'
+        'use_sim_time', default_value='True',
+        description='Use simulation clock if true',
     )
-    
     declare_headless_cmd = DeclareLaunchArgument(
-        'headless',
-        default_value='True',
-        description='Run Gazebo in headless mode'
+        'headless', default_value='False',
+        description='Run Gazebo in headless mode',
     )
-    
     declare_namespace_cmd = DeclareLaunchArgument(
-        'namespace',
-        default_value='',
-        description='Top-level namespace'
+        'namespace', default_value='',
+        description='Top-level namespace',
+    )
+    declare_map_name_cmd = DeclareLaunchArgument(
+        'map_name', default_value='sample_world',
+        description='Map name used in free mode (task:=0)',
+    )
+    declare_task_cmd = DeclareLaunchArgument(
+        'task', default_value='0',
+        description=(
+            'Task number: 0=free (uses map_name), '
+            '1=Task1 ウェイポイントナビゲーション, '
+            '2=Task2 ゴミ検出, '
+            '3=Task3 完全探索・分類'
+        ),
     )
 
-    declare_map_name_cmd = DeclareLaunchArgument(
-        'map_name',
-        default_value='sample_world',
-        description='Map name to load'
-    )
-    
-    # Function to resolve paths with the map name
     def get_paths_and_launch(context):
-        name = context.perform_substitution(map_name)
-        world_file = os.path.join(sim_dir, 'worlds', f'{name}.sdf')
-        map_file = os.path.join(nav2_dir, 'maps', f'{name}.yaml')
-        
-        # Include simulation launch file
+        task_str = context.perform_substitution(task)
+
+        if task_str in ('1', '2', '3'):
+            world_file = os.path.join(sim_dir, 'worlds', f'task{task_str}_warehouse.sdf')
+            map_file = os.path.join(nav2_dir, 'maps', 'warehouse.yaml')
+        else:
+            name = context.perform_substitution(map_name)
+            world_file = os.path.join(sim_dir, 'worlds', f'{name}.sdf')
+            map_file = os.path.join(nav2_dir, 'maps', f'{name}.yaml')
+
         simulation_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(sim_dir, 'launch', 'simulation.launch.py')
@@ -60,11 +64,10 @@ def generate_launch_description():
                 'headless': headless,
                 'use_sim_time': use_sim_time,
                 'namespace': namespace,
-                'world': world_file
-            }.items()
+                'world': world_file,
+            }.items(),
         )
-        
-        # Include localization launch file
+
         localization_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(nav2_dir, 'launch', 'localization_launch.py')
@@ -72,11 +75,10 @@ def generate_launch_description():
             launch_arguments={
                 'use_sim_time': use_sim_time,
                 'namespace': namespace,
-                'map': map_file
-            }.items()
+                'map': map_file,
+            }.items(),
         )
 
-        # Include navigation launch file
         navigation_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(nav2_dir, 'launch', 'navigation_launch.py')
@@ -86,21 +88,27 @@ def generate_launch_description():
                 'namespace': namespace,
                 'autostart': 'true',
                 'params_file': os.path.join(nav2_dir, 'params', 'nav2_params.yaml'),
-            }.items()
+            }.items(),
         )
 
-        return [simulation_launch, localization_launch, navigation_launch]
+        actions = [simulation_launch, localization_launch, navigation_launch]
 
-    # Create and return launch description
+        if task_str in ('1', '2', '3'):
+            judge_node = Node(
+                package='trail_task_judge',
+                executable=f'task{task_str}_judge_node.py',
+                name=f'task{task_str}_judge',
+                output='screen',
+            )
+            actions.append(judge_node)
+
+        return actions
+
     ld = LaunchDescription()
-
-    # Add declared arguments
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_headless_cmd)
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_map_name_cmd)
-    
-    # Add the actions to launch simulation and localization using OpaqueFunction
+    ld.add_action(declare_task_cmd)
     ld.add_action(OpaqueFunction(function=get_paths_and_launch))
-    
     return ld
