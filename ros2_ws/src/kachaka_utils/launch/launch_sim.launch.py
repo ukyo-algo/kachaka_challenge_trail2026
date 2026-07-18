@@ -1,12 +1,19 @@
 import os
+import subprocess
 
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
+
+def _kill_gazebo():
+    """起動前に残留している Gazebo プロセスを終了する。"""
+    subprocess.run(['pkill', '-f', 'gz_sim'], capture_output=True)
+    subprocess.run(['pkill', '-f', 'gz sim'], capture_output=True)
 
 
 def generate_launch_description():
@@ -46,6 +53,7 @@ def generate_launch_description():
     )
 
     def get_paths_and_launch(context):
+        _kill_gazebo()
         task_str = context.perform_substitution(task)
 
         if task_str in ('1', '2', '3'):
