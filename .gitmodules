@@ -3,4 +3,4 @@
 	url = https://github.com/Damin3927/kachaka-api
 [submodule "ros2_ws/src/kachaka_ros2_dev_kit"]
 	path = ros2_ws/src/kachaka_ros2_dev_kit
-	url = https://github.com/Damin3927/kachaka_ros2_dev_kit
+	url = git@github.com:kazuo-yokoi/kachaka_ros2_dev_kit.git
