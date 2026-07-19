@@ -12,3 +12,5 @@ __pycache__
 build/
 install/ 
 log/
+
+.DS_Store
